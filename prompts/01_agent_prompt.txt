@@ -1,0 +1,17 @@
+Develop a Python game using Pygame titled Astersnake, which combines the core mechanics of the classic arcade games Asteroids and Snake.
+
+Gameplay Overview:
+
+Player Control: The player pilots a triangular spaceship capable of rotating left and right, applying forward thrust, and firing bullets in the direction it's facing.
+Tail Mechanic: As the player collects energy orbs scattered throughout the game space, the ship gains a trailing tail that grows longer with each orb collected. The tail follows the path of the ship, and collision with the tail results in game over.
+Asteroids: The game space contains asteroids of varying sizes that drift in random directions. Shooting a large asteroid splits it into two medium ones; shooting a medium asteroid splits it into two small ones; small asteroids are destroyed upon being shot. Collision with any asteroid is fatal.
+Enemy Saucers: At intervals, enemy saucers enter the game space, firing projectiles at the player's ship. Destroying saucers yields bonus points.
+Screen Wrapping: Objects exiting one edge of the screen re-enter from the opposite edge, creating a continuous playfield.
+Scoring: Points are awarded for destroying asteroids and enemy saucers, as well as for collecting energy orbs.
+Game Over Conditions: The game ends when the player's ship collides with an asteroid, an enemy saucer, is hit by enemy fire, or collides with its own tail.
+
+Implementation Constraints:
+
+Use Python 3.x and the Pygame library.
+
+The game should be fully functional and playable without external dependencies beyond Pygame.
