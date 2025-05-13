@@ -8,7 +8,7 @@ FPS = 60
 SHIP_SIZE = 30
 BULLET_SPEED = 8
 ASTEROID_SIZES = {'large': 60, 'medium': 40, 'small': 20}
-ASTEROID_SPEEDS = {'large': 2, 'medium': 3, 'small': 4}
+ASTEROID_SPEEDS = {'large': 1.5, 'medium': 1.7, 'small': 2}
 ORB_RADIUS = 10
 SAUCER_SIZE = 40
 TAIL_SEGMENT_LENGTH = 12
@@ -42,6 +42,7 @@ class Ship:
         self.tail_length = 0
         self.alive = True
         self.cooldown = 0
+        self.invincibility_timer = 0  # frames
 
     def update(self, keys):
         if keys[pygame.K_LEFT]:
@@ -63,6 +64,8 @@ class Ship:
             self.tail = self.tail[:TAIL_MAX_POINTS]
         if self.cooldown > 0:
             self.cooldown -= 1
+        if self.invincibility_timer > 0:
+            self.invincibility_timer -= 1
 
     def grow_tail(self):
         self.tail_length += TAIL_SEGMENT_LENGTH
@@ -71,15 +74,16 @@ class Ship:
         # Draw tail
         if len(self.tail) > 1:
             pygame.draw.lines(surf, (0, 255, 0), False, self.tail, 4)
-        # Draw ship
-        dx, dy = angle_to_vector(self.angle)
-        perp = (-dy, dx)
-        points = [
-            (self.pos[0] + dx * SHIP_SIZE, self.pos[1] + dy * SHIP_SIZE),
-            (self.pos[0] - dx * SHIP_SIZE * 0.6 + perp[0] * SHIP_SIZE * 0.5, self.pos[1] - dy * SHIP_SIZE * 0.6 + perp[1] * SHIP_SIZE * 0.5),
-            (self.pos[0] - dx * SHIP_SIZE * 0.6 - perp[0] * SHIP_SIZE * 0.5, self.pos[1] - dy * SHIP_SIZE * 0.6 - perp[1] * SHIP_SIZE * 0.5)
-        ]
-        pygame.draw.polygon(surf, (255, 255, 255), points)
+        # Draw ship (blink if invincible)
+        if self.invincibility_timer == 0 or (self.invincibility_timer // 5) % 2 == 0:
+            dx, dy = angle_to_vector(self.angle)
+            perp = (-dy, dx)
+            points = [
+                (self.pos[0] + dx * SHIP_SIZE, self.pos[1] + dy * SHIP_SIZE),
+                (self.pos[0] - dx * SHIP_SIZE * 0.6 + perp[0] * SHIP_SIZE * 0.5, self.pos[1] - dy * SHIP_SIZE * 0.6 + perp[1] * SHIP_SIZE * 0.5),
+                (self.pos[0] - dx * SHIP_SIZE * 0.6 - perp[0] * SHIP_SIZE * 0.5, self.pos[1] - dy * SHIP_SIZE * 0.6 - perp[1] * SHIP_SIZE * 0.5)
+            ]
+            pygame.draw.polygon(surf, (255, 255, 255), points)
 
     def shoot(self):
         if self.cooldown == 0:
@@ -91,6 +95,9 @@ class Ship:
         return None
 
     def check_tail_collision(self):
+        # Only check if tail is long enough to wrap around
+        if self.tail_length < SHIP_SIZE * 2:
+            return False
         # Ignore first few tail points (ship body)
         for pt in self.tail[SHIP_SIZE*2//TAIL_SEGMENT_LENGTH:]:
             if distance(self.pos, pt) < TAIL_SEGMENT_LENGTH:
@@ -210,6 +217,16 @@ def main():
     saucer_timer = 0
     running = True
     game_over = False
+    lives = 10  # Add lives
+
+    def reset_ship():
+        ship.pos = (WIDTH // 2, HEIGHT // 2)
+        ship.angle = 0
+        ship.vel = [0, 0]
+        ship.tail = []
+        ship.tail_length = 0
+        ship.cooldown = 0
+        ship.invincibility_timer = FPS * 2  # 2 seconds of invincibility
 
     while running:
         clock.tick(FPS)
@@ -247,21 +264,34 @@ def main():
             saucershots = [s for s in saucershots if s.alive()]
 
             # Collisions
-            # Ship with asteroids
-            for asteroid in asteroids:
-                if distance(ship.pos, asteroid.pos) < asteroid.radius + SHIP_SIZE//2:
+            hit = False
+            if ship.invincibility_timer == 0:
+                # Ship with asteroids
+                for asteroid in asteroids:
+                    if distance(ship.pos, asteroid.pos) < asteroid.radius + SHIP_SIZE//2:
+                        hit = True
+                        break
+                # Ship with saucers
+                if not hit:
+                    for saucer in saucers:
+                        if distance(ship.pos, saucer.pos) < saucer.radius + SHIP_SIZE//2:
+                            hit = True
+                            break
+                # Ship with saucer shots
+                if not hit:
+                    for shot in saucershots:
+                        if distance(ship.pos, shot.pos) < SHIP_SIZE//2 + 3:
+                            hit = True
+                            break
+                # Ship with tail
+                if not hit and ship.check_tail_collision():
+                    hit = True
+            if hit:
+                lives -= 1
+                if lives <= 0:
                     game_over = True
-            # Ship with saucers
-            for saucer in saucers:
-                if distance(ship.pos, saucer.pos) < saucer.radius + SHIP_SIZE//2:
-                    game_over = True
-            # Ship with saucer shots
-            for shot in saucershots:
-                if distance(ship.pos, shot.pos) < SHIP_SIZE//2 + 3:
-                    game_over = True
-            # Ship with tail
-            if ship.check_tail_collision():
-                game_over = True
+                else:
+                    reset_ship()
             # Ship with orbs
             for orb in orbs[:]:
                 if distance(ship.pos, orb.pos) < SHIP_SIZE//2 + ORB_RADIUS:
@@ -322,6 +352,8 @@ def main():
         ship.draw(screen)
         score_text = font.render(f'Score: {score}', True, (255,255,255))
         screen.blit(score_text, (10, 10))
+        lives_text = font.render(f'Lives: {lives}', True, (255,255,0))
+        screen.blit(lives_text, (10, 40))
         if game_over:
             over_text = font.render('GAME OVER! Press R to restart.', True, (255, 0, 0))
             screen.blit(over_text, (WIDTH//2 - over_text.get_width()//2, HEIGHT//2))
